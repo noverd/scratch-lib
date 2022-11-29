@@ -1,7 +1,7 @@
 import json
 import re
 import requests
-from exceptions import LoginError
+from exceptions import LoginError, ChangePassError
 
 
 class Session:
@@ -14,6 +14,25 @@ class Session:
         self.session_id: str = self.get_sessionid(self.username, self.password)
         self.csrf_token: str = self.get_csrf()
         self.update_headers()
+
+    def relogin(self):
+        self.session_id: str = self.get_sessionid(self.username, self.password)
+        self.csrf_token: str = self.get_csrf()
+        self.update_headers()
+
+    def change_password(self, new_pass: str) -> None:
+        payload = json.dumps({"csrfmiddlewaretoken": self.csrf_token, "old_password": self.password,
+                              "new_password1": new_pass, "new_password2": new_pass})
+        req = requests.post("https://scratch.mit.edu/accounts/password_change/", headers=self.headers, data=payload)
+        if req.status_code != 302:
+            raise ChangePassError("Password has already been changed or you are banned from scratch")
+        self.password = new_pass
+        self.relogin()
+
+    def change_country(self, country: str) -> None:
+        country = country.replace(" ", "+")
+        payload = json.dumps({"csrfmiddlewaretoken": self.csrf_token, "country": country})
+        requests.post("https://scratch.mit.edu/accounts/settings/", headers=self.headers, data=payload)
 
     def update_headers(self) -> None:
         self.cookies = f"scratchcsrftoken={self.csrf_token};scratchsessionsid={self.session_id};" \
@@ -59,4 +78,3 @@ class Session:
         except Exception:
             raise LoginError("Login credits are wrong or you banned on scratch")
         return session_id
-

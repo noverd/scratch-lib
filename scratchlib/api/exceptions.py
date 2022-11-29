@@ -4,3 +4,7 @@ class ScratchApiException(Exception):
 
 class LoginError(ScratchApiException):
     pass
+
+
+class ChangePassError(ScratchApiException):
+    pass
