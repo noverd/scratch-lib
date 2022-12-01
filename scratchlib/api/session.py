@@ -35,6 +35,7 @@ class Session:
         country = country.replace(" ", "+")
         payload = json.dumps({"csrfmiddlewaretoken": self.session.headers["X-CSRFToken"], "country": country})
         self.session.post("https://scratch.mit.edu/accounts/settings/", data=payload)
+
     def login(self):
         csrf = self.get_csrf()
         self.session.headers["X-CSRFToken"] = csrf
@@ -61,6 +62,6 @@ class Session:
         try:
             session_id = str(re.search('"(.*)"', request.headers["Set-Cookie"]).group())
             token = request.json()[0]["token"]
-        except Exception:
-            raise LoginError("Login credits are wrong or you banned on scratch")
+        except Exception as e:
+            raise LoginError("Login credits are wrong or you banned on scratch") from e
         return session_id, token
