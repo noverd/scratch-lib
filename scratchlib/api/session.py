@@ -48,7 +48,7 @@ class Session:
     def get_csrf(self):
         req = self.session.get("https://scratch.mit.edu/csrf_token/")
         try:
-            csrf = re.search("scratchcsrftoken=(.*?);", req.headers["Set-Cookie"]).group(1)
+            csrf = re.search("scratchcsrftoken=(.*?);", req.headers["Set-Cookie"])[1]
         except Exception:
             LoginError("Can't get CSRF token")
         else:
