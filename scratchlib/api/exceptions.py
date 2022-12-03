@@ -8,3 +8,7 @@ class LoginError(ScratchApiException):
 
 class ChangePassError(ScratchApiException):
     pass
+
+
+class UserGettingError(ScratchApiException):
+    pass
