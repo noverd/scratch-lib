@@ -12,3 +12,11 @@ class ChangePassError(ScratchApiException):
 
 class UserGettingError(ScratchApiException):
     pass
+
+
+class UnauthorizedError(ScratchApiException):
+    pass
+
+
+class StudioGettingError(ScratchApiException):
+    pass
