@@ -12,6 +12,3 @@ class ClassRoom:
                                  ".parser")
         return \
             [_.find("span").contents[1].contents[0].strip() for _ in soup.find_all("li", {"class": "user thumb item"})]
-
-
-print(ClassRoom(358511).get_members_from_page())

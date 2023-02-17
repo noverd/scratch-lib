@@ -1,9 +1,9 @@
 import json
 import re
-from typing import Tuple, Any
+from typing import Tuple
 
 import requests
-from exceptions import LoginError, ChangePassError
+from .exceptions import LoginError, ChangePassError
 
 
 class Session:
