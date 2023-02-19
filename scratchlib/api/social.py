@@ -167,6 +167,11 @@ class User:
     def get_message_count(self) -> int:
         return self.session.get(f"https://api.scratch.mit.edu/users/{self.username}/messages/count/").json()["count"]
 
+    def toggle_commenting(self):
+        if self.session.username != self.username:
+            raise UnauthorizedError("Can`t toggle profile commenting - This is not your profile/user.")
+        self.session.post(f"https://scratch.mit.edu/site-api/comments/user/{self.username}/toggle-comments/")
+
     def post_comment(self, content: str, parent_id="", comment_id="") -> None:
         data = {
             "commentee_id": comment_id,
@@ -174,6 +179,58 @@ class User:
             "parent_id": parent_id,
         }
         self.session.post(f"https://scratch.mit.edu/site-api/comments/user/{self.username}/add/", data=json.dumps(data))
+
+    def get_followers(self, all=False, limit=20, offset=0, get_nick=False):
+        if all:
+            users = []
+            offset = 0
+            while True:
+                res = self.session.get(
+                    f"https://api.scratch.mit.edu/users/{self.username}/followers/?limit=40&offset={str(offset)}"
+                ).json()
+
+                users += res
+                if len(res) != 40:
+                    break
+                offset += 40
+        else:
+            users = list(self.session.get(
+                f"https://api.scratch.mit.edu/users/{self.username}/followers/?limit={str(limit)}&offset={str(offset)}").json())
+
+        if get_nick:
+            return [i["username"] for i in users]
+        return [User(self.session, user) for user in users]
+
+    def get_following(self, all=False, limit=20, offset=0, get_nick=False):
+        if all:
+            users = []
+            offset = 0
+            while True:
+                res = self.session.get(
+                    f"https://api.scratch.mit.edu/users/{self.username}/following/?limit=40&offset={str(offset)}"
+                ).json()
+
+                users += res
+                if len(res) != 40:
+                    break
+                offset += 40
+        else:
+            users = list(self.session.get(
+                f"https://api.scratch.mit.edu/users/{self.username}/following/?limit={str(limit)}&offset={str(offset)}").json())
+
+        if get_nick:
+            return [i["username"] for i in users]
+        return [User(self.session, user) for user in users]
+
+    def follow(self):
+        return self.session.put(
+            f"https://scratch.mit.edu/site-api/users/followers/{self.username}/add/?usernames={self.username}"
+        ).json()
+
+    def unfollow(self):
+        return self.session.put(
+            f"https://scratch.mit.edu/site-api/users/followers/{self.username}/remove/?usernames={self.username}"
+        ).json()
 
 
 class Studio:
