@@ -1,17 +1,21 @@
-import session
-from exceptions import UserGettingError, UnauthorizedError, StudioGettingError
+import scratchlib.api.session as session
+from scratchlib.api.exceptions import UserGettingError, UnauthorizedError, StudioGettingError, ProjectUnsharedError, ProjectGettingError
 import json
 
 
 class Project:
-    def __init__(self, scratch_session: session.Session, project_id: int):
+    def __init__(self, scratch_session: session.Session, project_id: int, author_username = None):
+        self.author_username = author_username
         self.session = scratch_session.session
         self.scratch_session = scratch_session
         self.id: int = project_id
         self.update()
 
     def update(self):
-        data = self.session.get(f"https://api.scratch.mit.edu/projects/{self.id}/").json()
+        try:
+            data = self.session.get(f"https://api.scratch.mit.edu/projects/{self.id}/").json()
+        except:
+            raise ProjectGettingError("Can't get project")
         self.title: str = data["title"]
         self.description: str = data["description"]
         self.instructions: str = data["instructions"]
@@ -19,7 +23,7 @@ class Project:
         self.public: bool = data["public"]
         self.comments_allowed: bool = data["comments_allowed"]
         self.is_published: bool = data["is_published"]
-        self.author: User = User(self.scratch_session, data["author"])
+        self.author: User = User(self.scratch_session, data["author"], username=self.author_username)
         self.image: str = data["instructions"]
         self.images: dict = data["image"]
         self.created: str = data["history"]["created"]
@@ -33,6 +37,10 @@ class Project:
         self.parent: int = data["remix"].get("parent")
         self.root: int = data["remix"]["root"]
         self.is_remix: bool = bool(self.parent)
+        try:
+            self.project_token: str = data["project_token"]
+        except:
+            raise ProjectUnsharedError("Can't working with Unshared Project")
 
     def get_remixes(self, all=False, limit=20, offset=0):
         if all:
@@ -50,6 +58,16 @@ class Project:
             ).json()
 
         return [Project(self.scratch_session, _) for _ in projects]
+
+    def remix(self, title: str, return_id=False):
+        url = f'https://projects.scratch.mit.edu/?is_remix=1&original_id={self.id}&title={title}'
+        json_data = self.session.post(url, json=self.get_scripts()).json()
+        if json_data["status"] != "ok":
+            return None
+        if return_id:
+            return int(json_data["content-name"])
+        else:
+            return Project(self.scratch_session, json_data["content-name"], self.scratch_session.username)
 
     def post_comment(self, content, parent_id="", comment_id=""):
         data = {
@@ -129,10 +147,19 @@ class Project:
         data = {"title": title}
         self.session.put(f"https://api.scratch.mit.edu/projects/{str(self.id)}", data=json.dumps(data))
 
+    def get_scripts(self):
+        try:
+            return self.session.get(
+                f"https://projects.scratch.mit.edu/{str(self.id)}?token={str(self.project_token)}"
+            ).json()
+        except:
+            raise ProjectUnsharedError("Can't working with Unshared Project")
+
 
 class User:
-    def __init__(self, scratch_session: session.Session, user):
+    def __init__(self, scratch_session: session.Session, user, username: str = None):
         self.session = scratch_session.session
+        self.username = username
         if isinstance(user, str):
             self.username = user
             data = self.session.get(f"https://api.scratch.mit.edu/users/{self.username}").json()
@@ -146,6 +173,28 @@ class User:
             data = user
         else:
             raise UserGettingError("Uncorrected type of argument 'user'")
+        self.id: int = data["id"]
+        self.scratch_team: bool = data["scratchteam"]
+        self.join_time = data["history"]["joined"]
+        self.profile_id: int = data["profile"]["id"]
+        self.icons: dict = data["profile"]["images"]
+        try:
+            self.status = data["profile"]["status"]
+            self.bio = data["profile"]["bio"]
+            self.country = data["profile"]["country"]
+        except KeyError:
+            self.status = None
+            self.bio = None
+            self.country = None
+
+    def update(self):
+        data = self.session.get(f"https://api.scratch.mit.edu/users/{self.username}").json()
+        try:
+            data["code"]
+        except Exception:
+            pass  # All OK
+        else:
+            raise UserGettingError(data["code"])
         self.id: int = data["id"]
         self.scratch_team: bool = data["scratchteam"]
         self.join_time = data["history"]["joined"]
@@ -200,6 +249,57 @@ class User:
         if get_nick:
             return [i["username"] for i in users]
         return [User(self.session, user) for user in users]
+
+    def get_favorites(self, all=False, limit=20, offset=0, get_id: bool = False):
+        if all:
+            projects = []
+            offset = 0
+            while True:
+                res = self.session.get(
+                    f"https://api.scratch.mit.edu/users/{self.username}/favorites/?limit=40&offset={str(offset)}"
+                ).json()
+
+                projects += res
+                if len(res) != 40:
+                    break
+                offset += 40
+        else:
+            projects = list(
+                self.session.get(
+                    f"https://api.scratch.mit.edu/users/{self.username}/favorites/?limit={str(limit)}&offset={str(offset)}"
+                ).json()
+            )
+
+        if get_id:
+            return [project["id"] for project in projects]
+        return [Project(self.session, project) for project in projects]
+
+    def get_projects(self, all=False, limit=20, offset=0, get_id: bool = False):
+        if all:
+            offset = 0
+            projects = []
+            while True:
+                res = self.session.get(
+                    f"https://api.scratch.mit.edu/users/{self.username}/projects/?limit=40&offset={str(offset)}"
+                ).json()
+                projects += res
+                if len(res) != 40:
+                    break
+                offset += 40
+        else:
+
+            projects = self.session.get(
+                f"https://api.scratch.mit.edu/users/{self.username}/projects/?limit={str(limit)}&offset={str(offset)}"
+            ).json()
+
+        for x, i in enumerate(projects):
+            projects[x].update({
+                "author": self.username
+            })
+        if get_id:
+            return [project["id"] for project in projects]
+
+        return [Project(self.session, project) for project in projects]
 
     def get_following(self, all=False, limit=20, offset=0, get_nick=False):
         if all:

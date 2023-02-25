@@ -20,3 +20,10 @@ class UnauthorizedError(ScratchApiException):
 
 class StudioGettingError(ScratchApiException):
     pass
+
+
+class ProjectUnsharedError(ScratchApiException):
+    pass
+
+class ProjectGettingError(ScratchApiException):
+    pass
